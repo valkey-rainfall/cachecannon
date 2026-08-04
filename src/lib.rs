@@ -8,6 +8,7 @@ pub mod output;
 pub mod runner;
 pub mod saturation;
 pub mod sharded_counter;
+pub mod sharded_histogram;
 pub mod viewer;
 pub mod worker;
 

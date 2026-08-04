@@ -194,13 +194,20 @@ fn generate_prometheus_output() -> String {
                 let _ = writeln!(output, "{} {}", name, v);
             }
             metriken::Value::Other(any) => {
-                // Try to downcast to AtomicHistogram. We emit a "summary"
+                // Try to downcast to ShardedHistogram first (our sharded type),
+                // then fall back to AtomicHistogram. We emit a "summary"
                 // (with `quantile="..."` rows) rather than a Prometheus
                 // "histogram" (which would require cumulative `_bucket{le=}`
                 // rows). The previous code declared `histogram` while
                 // emitting `quantile`, which is invalid exposition.
-                if let Some(histogram) = any.downcast_ref::<metriken::AtomicHistogram>()
-                    && let Some(snapshot) = histogram.load()
+                let snapshot = if let Some(h) = any.downcast_ref::<crate::sharded_histogram::ShardedHistogram>() {
+                    h.load()
+                } else if let Some(histogram) = any.downcast_ref::<metriken::AtomicHistogram>() {
+                    histogram.load()
+                } else {
+                    None
+                };
+                if let Some(snapshot) = snapshot
                 {
                     write_help(&mut output, name, description);
                     let _ = writeln!(output, "# TYPE {} summary", name);
@@ -303,7 +310,9 @@ fn create_snapshot() -> Snapshot {
                 });
             }
             Some(metriken::Value::Other(other)) => {
-                let histogram = if let Some(h) = other.downcast_ref::<metriken::AtomicHistogram>() {
+                let histogram = if let Some(h) = other.downcast_ref::<crate::sharded_histogram::ShardedHistogram>() {
+                    h.load()
+                } else if let Some(h) = other.downcast_ref::<metriken::AtomicHistogram>() {
                     h.load()
                 } else if let Some(h) = other.downcast_ref::<metriken::RwLockHistogram>() {
                     h.load()

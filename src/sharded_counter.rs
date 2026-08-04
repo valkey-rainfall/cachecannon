@@ -201,7 +201,7 @@ impl metriken::Metric for Gauge {
 
 /// Get the shard index for the current thread.
 #[inline]
-fn shard_index() -> usize {
+pub(crate) fn shard_index() -> usize {
     SHARD_ID.get().unwrap_or_else(|| {
         thread_local! {
             static ID: u8 = const { 0 };
